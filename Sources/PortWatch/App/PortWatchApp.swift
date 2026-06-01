@@ -8,7 +8,7 @@ struct PortWatchApp: App {
     @State private var portStore = PortStore()
 
     var body: some Scene {
-        WindowGroup("PortWatch", id: "main") {
+        WindowGroup("监听端口", id: "main") {
             RootView(store: portStore)
                 .preferredColorScheme(portStore.colorSchemePreference.swiftUIScheme)
                 .task {

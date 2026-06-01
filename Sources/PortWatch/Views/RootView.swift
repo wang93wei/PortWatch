@@ -22,6 +22,7 @@ struct RootView: View {
             }
         }
         .searchable(text: $store.searchText, prompt: "搜索端口、进程、PID、用户、路径")
+        .navigationTitle(store.selectedFilter.title)
         .frame(minWidth: 980, minHeight: 620)
     }
 }

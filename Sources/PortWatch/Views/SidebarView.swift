@@ -13,7 +13,7 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .navigationTitle("PortWatch")
+        // 主窗口标题由 RootView 统一设置，避免 split view 内重复显示标题。
     }
 
     private func icon(for filter: PortFilter) -> String {
