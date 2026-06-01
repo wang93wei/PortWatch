@@ -17,6 +17,12 @@ public enum PortScannerError: LocalizedError, Equatable {
     }
 }
 
+public protocol PortScanning: Sendable {
+    func scanListeningPorts() async throws -> PortScanResult
+}
+
+extension PortScannerService: PortScanning {}
+
 public struct PortScannerService: Sendable {
     private let executor: CommandExecuting
     private let parser: LsofParser
