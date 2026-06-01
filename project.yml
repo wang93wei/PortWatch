@@ -1,0 +1,86 @@
+name: PortWatch
+options:
+  bundleIdPrefix: local.portwatch
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGNING_REQUIRED: "NO"
+    CODE_SIGNING_ALLOWED: "NO"
+    ENABLE_HARDENED_RUNTIME: "NO"
+targets:
+  PortWatch:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Sources/PortWatch
+        excludes:
+          - "Resources/Info.plist"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.portwatch.app
+        PRODUCT_NAME: PortWatch
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        COMBINE_HIDPI_IMAGES: "YES"
+        ENABLE_PREVIEWS: "YES"
+        GENERATE_INFOPLIST_FILE: "NO"
+        INFOPLIST_FILE: Sources/PortWatch/Resources/Info.plist
+    dependencies:
+      - target: PortWatchCore
+        embed: false
+  PortWatchCore:
+    type: framework
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Sources/PortWatchCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.portwatch.core
+        PRODUCT_NAME: PortWatchCore
+        DEFINES_MODULE: "YES"
+        SKIP_INSTALL: "YES"
+        BUILD_LIBRARY_FOR_DISTRIBUTION: "NO"
+  PortWatchCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Tests/PortWatchCoreTests
+        excludes:
+          - "Fixtures/**"
+      - path: Tests/PortWatchCoreTests/Fixtures
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.portwatch.tests
+    dependencies:
+      - target: PortWatchCore
+        embed: false
+schemes:
+  PortWatch:
+    build:
+      targets:
+        PortWatch: all
+        PortWatchCore: all
+        PortWatchCoreTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - PortWatchCoreTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

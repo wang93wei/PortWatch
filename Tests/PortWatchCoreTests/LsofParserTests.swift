@@ -19,7 +19,9 @@ final class LsofParserTests: XCTestCase {
     }
 
     private func fixture(_ name: String) throws -> String {
-        let url = Bundle.module.url(forResource: name, withExtension: nil)!
+        let bundle = Bundle(for: type(of: self))
+        let url = bundle.url(forResource: name, withExtension: nil, subdirectory: "Fixtures")
+            ?? bundle.url(forResource: name, withExtension: nil)!
         return try String(contentsOf: url, encoding: .utf8)
     }
 }
