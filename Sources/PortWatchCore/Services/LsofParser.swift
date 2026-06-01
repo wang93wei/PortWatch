@@ -15,9 +15,16 @@ public struct LsofParser: Sendable {
     public func parse(_ output: String) -> LsofParseResult {
         var entries: [PortEntry] = []
         var skipped = 0
+        // lsof 对 `*:port` 通配 listen 会输出 IPv4 + IPv6 两行（address 都是 `*`、port/pid/proc/user 相同），
+        // 解析后 PortEntry.id 会重复，触发 SwiftUI ForEach 警告。用 id 做 Set 去重保证唯一。
+        var seenIDs: Set<String> = []
 
         for line in output.split(separator: "\n").dropFirst() {
             guard let entry = parseLine(String(line)) else {
+                skipped += 1
+                continue
+            }
+            if !seenIDs.insert(entry.id).inserted {
                 skipped += 1
                 continue
             }

@@ -43,8 +43,11 @@ public struct ProcessTerminator: Sendable {
     public func terminate(entry: PortEntry, mode: TerminationMode) async throws -> ProcessTerminationResult {
         let signal = mode.signal
         logger.info("termination requested pid=\(entry.pid) signal=\(signal.rawValue) privilege=\(entry.privilegeLevel.rawValue)")
-        guard await identityVerifier.verify(entry: entry) else {
-            logger.error("termination blocked reason=identity_changed pid=\(entry.pid)")
+        switch await identityVerifier.verify(entry: entry) {
+        case .matched:
+            break
+        case .mismatched(let reason):
+            logger.error("termination blocked reason=identity_changed pid=\(entry.pid) detail=\(reason)")
             throw ProcessTerminationError.processIdentityChanged
         }
         switch entry.privilegeLevel {

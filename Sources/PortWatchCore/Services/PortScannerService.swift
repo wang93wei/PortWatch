@@ -57,7 +57,11 @@ public struct PortScannerService: Sendable {
         var enrichedEntries: [PortEntry] = []
         for entry in parsed.entries {
             let metadata = await metadataProvider.metadata(for: entry.pid)
-            enrichedEntries.append(entry.withMetadata(metadata))
+            // lsof 的 COMMAND 字段对 .app bundle 内 binary 会取 .app 短名（如 ApifoxApp），
+            // 而 verify 阶段用 ps -o ucomm= 拿的是 binary 短名（ApifoxAppAgent）—— 同进程两源不一致。
+            // 覆盖为 ps 拿到的 canonical name，verify 阶段 processName 才能匹配。
+            let canonical = entry.overriding(processName: metadata.processName ?? entry.processName)
+            enrichedEntries.append(canonical.withMetadata(metadata))
         }
         let duration = Date().timeIntervalSince(start)
         logger.info("scan finished entries=\(enrichedEntries.count) skipped=\(parsed.skippedLineCount) duration=\(duration)")
