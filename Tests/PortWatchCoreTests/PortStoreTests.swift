@@ -22,7 +22,9 @@ final class PortStoreTests: XCTestCase {
         XCTAssertNotNil(errorMessage)
     }
 
-    func testRefreshSkipsWhenAlreadyRefreshing() async {
+    /// 重入时 refreshNow 不再静默丢弃：等当前扫描完成后再扫一次，保证 caller 意图被执行。
+    /// 旧语义是直接 return false（"skip"），导致 terminate 后端口条目要等下一轮自动刷新才更新。
+    func testRefreshReentrancyStillRescans() async {
         let scanner = SlowScanner()
         let store = await PortStore(scanner: scanner, favoritesStore: InMemoryFavoritesStore(initialFavorites: []))
 
@@ -31,7 +33,7 @@ final class PortStoreTests: XCTestCase {
         _ = await (first, second)
 
         let callCount = await scanner.callCount
-        XCTAssertEqual(callCount, 1)
+        XCTAssertEqual(callCount, 2, "第二个 refreshNow 应等当前扫描完成后再触发一次新扫描")
     }
 
     func testFilteredEntriesUseFilterSearchAndFavorites() async {

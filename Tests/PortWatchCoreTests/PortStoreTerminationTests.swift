@@ -278,6 +278,73 @@ final class PortStoreTerminationTests: XCTestCase {
         XCTAssertNil(forceCandidate)
         XCTAssertNil(pendingForceEntry)
     }
+
+    func testEntrySelectionChangedClearsTerminationMessage() async {
+        // 选中另一个 entry 时清空 lastTerminationMessage，
+        // 避免显示陈旧 PID（比如之前在 Apifox 956 点的结束，切换到 QQMusic 71733 还显示 956）。
+        let entry = sample(port: 3000)
+        let scanner = MockScanner(results: [
+            .success(PortScanResult(entries: [entry], skippedLineCount: 0, duration: 0.01))
+        ])
+        let terminator = MockTerminator()
+        let store = await PortStore(
+            scanner: scanner,
+            favoritesStore: InMemoryFavoritesStore(initialFavorites: []),
+            refreshIntervalStore: InMemoryRefreshIntervalStore(interval: .paused),
+            terminator: terminator
+        )
+
+        await store.terminate(entry: entry, mode: .graceful)
+        let messageBeforeSwitch = await store.lastTerminationMessage
+        XCTAssertNotNil(messageBeforeSwitch, "prerequisite: terminate 应该设置消息")
+
+        await store.entrySelectionChanged()
+
+        let messageAfterSwitch = await store.lastTerminationMessage
+        XCTAssertNil(messageAfterSwitch, "切换 entry 后消息应清空")
+    }
+
+    /// 用户报的现象：点击"结束进程"后，列表里的端口没有立刻消失，要等下一次自动刷新才更新。
+    /// 根因：startAutoRefresh 启动的后台 Task 正在 in-flight 时（isRefreshing == true），
+    /// store.terminate 内部 await refreshNow() 会因重入保护被静默丢弃，entries 不更新。
+    /// 修复后：refreshNow 在重入时应等待当前扫描完成、然后再扫一次，保证 caller 意图被执行。
+    func testTerminateRefreshesEvenWhenAnotherRefreshInFlight() async {
+        let entry = sample(port: 3000)
+        // 第一次 scan：进程还在；第二次 scan：进程已退出（terminator 的 mock 默认返回 signalSent）
+        let scanner = SequentialSlowScanner(scans: [
+            PortScanResult(entries: [entry], skippedLineCount: 0, duration: 0.05),
+            PortScanResult(entries: [], skippedLineCount: 0, duration: 0.05)
+        ])
+        let terminator = MockTerminator()
+        let store = await PortStore(
+            scanner: scanner,
+            favoritesStore: InMemoryFavoritesStore(initialFavorites: []),
+            refreshIntervalStore: InMemoryRefreshIntervalStore(interval: .paused),
+            terminator: terminator
+        )
+
+        // 模拟后台 auto-refresh 任务正 in-flight（isRefreshing == true）
+        async let backgroundRefresh: Bool = store.refreshNow()
+        // 用户此时点"结束进程"
+        async let kill: Void = store.terminate(entry: entry, mode: .graceful)
+        _ = await (backgroundRefresh, kill)
+
+        let entries = await store.entries
+        let callCount = await scanner.callCount
+        let lastRefreshDate = await store.lastRefreshDate
+        XCTAssertTrue(
+            entries.isEmpty,
+            "terminate 触发的 refresh 不能被 in-flight 阻塞：应反映第二次 scan 的结果"
+        )
+        XCTAssertGreaterThanOrEqual(
+            callCount, 2,
+            "terminate 触发的 refreshNow 必须实际再扫一次"
+        )
+        XCTAssertNotNil(
+            lastRefreshDate,
+            "terminate 触发的成功 refresh 应更新 lastRefreshDate"
+        )
+    }
 }
 
 private struct SecretLocalizedError: LocalizedError {
@@ -323,6 +390,24 @@ private actor MockScanner: PortScanning {
 
     func scanListeningPorts() async throws -> PortScanResult {
         try results.removeFirst().get()
+    }
+}
+
+/// 慢速 scanner：每次调用 sleep 50ms 后按顺序返回预设的 scan 结果。
+/// 用来模拟"auto-refresh 任务正 in-flight"的场景。
+private actor SequentialSlowScanner: PortScanning {
+    private(set) var callCount = 0
+    private let scans: [PortScanResult]
+
+    init(scans: [PortScanResult]) {
+        self.scans = scans
+    }
+
+    func scanListeningPorts() async throws -> PortScanResult {
+        callCount += 1
+        try await Task.sleep(for: .milliseconds(50))
+        let index = min(callCount - 1, scans.count - 1)
+        return scans[index]
     }
 }
 

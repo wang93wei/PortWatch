@@ -16,7 +16,7 @@ final class ProcessTerminatorTests: XCTestCase {
 
     func testCurrentUserProcessUsesTermSignalFirst() async throws {
         let executor = MockSignalExecutor()
-        let verifier = MockProcessIdentityVerifier(result: true)
+        let verifier = MockProcessIdentityVerifier(result: .matched)
         let logger = MockLogger()
         let terminator = ProcessTerminator(signalExecutor: executor, identityVerifier: verifier, logger: logger)
         let entry = sample(privilege: .currentUser)
@@ -35,7 +35,7 @@ final class ProcessTerminatorTests: XCTestCase {
     func testRootProcessRequiresAuthenticationAndHelper() async throws {
         let auth = MockAuthenticationClient(result: true)
         let helper = MockPrivilegedHelperClient(result: .success(ProcessTerminationResult(status: .signalSent, message: "TERM sent by helper")))
-        let verifier = MockProcessIdentityVerifier(result: true)
+        let verifier = MockProcessIdentityVerifier(result: .matched)
         let logger = MockLogger()
         let terminator = ProcessTerminator(authenticationClient: auth, helperClient: helper, identityVerifier: verifier, logger: logger)
         let entry = sample(privilege: .rootOrSystem)
@@ -57,7 +57,7 @@ final class ProcessTerminatorTests: XCTestCase {
             status: .helperUnavailable("node server.js --token=secret"),
             message: "node server.js --token=secret"
         )))
-        let verifier = MockProcessIdentityVerifier(result: true)
+        let verifier = MockProcessIdentityVerifier(result: .matched)
         let logger = MockLogger()
         let terminator = ProcessTerminator(authenticationClient: auth, helperClient: helper, identityVerifier: verifier, logger: logger)
 
@@ -72,7 +72,7 @@ final class ProcessTerminatorTests: XCTestCase {
     func testCancelledAuthenticationDoesNotCallHelper() async {
         let auth = MockAuthenticationClient(result: false)
         let helper = MockPrivilegedHelperClient(result: .success(ProcessTerminationResult(status: .signalSent, message: "TERM sent by helper")))
-        let verifier = MockProcessIdentityVerifier(result: true)
+        let verifier = MockProcessIdentityVerifier(result: .matched)
         let logger = MockLogger()
         let terminator = ProcessTerminator(authenticationClient: auth, helperClient: helper, identityVerifier: verifier, logger: logger)
 
@@ -92,7 +92,7 @@ final class ProcessTerminatorTests: XCTestCase {
     func testAuthenticationCancellationErrorDoesNotCallHelper() async {
         let auth = MockAuthenticationClient(result: true, error: ProcessTerminationError.authenticationCancelled)
         let helper = MockPrivilegedHelperClient(result: .success(ProcessTerminationResult(status: .signalSent, message: "TERM sent by helper")))
-        let verifier = MockProcessIdentityVerifier(result: true)
+        let verifier = MockProcessIdentityVerifier(result: .matched)
         let logger = MockLogger()
         let terminator = ProcessTerminator(authenticationClient: auth, helperClient: helper, identityVerifier: verifier, logger: logger)
 
@@ -111,7 +111,9 @@ final class ProcessTerminatorTests: XCTestCase {
 
     func testIdentityMismatchStopsBeforeSignal() async {
         let executor = MockSignalExecutor()
-        let verifier = MockProcessIdentityVerifier(result: false)
+        let verifier = MockProcessIdentityVerifier(
+            result: .mismatched(.processNameMismatch(expected: "nginx", actual: "python"))
+        )
         let logger = MockLogger()
         let terminator = ProcessTerminator(signalExecutor: executor, identityVerifier: verifier, logger: logger)
 
@@ -121,7 +123,9 @@ final class ProcessTerminatorTests: XCTestCase {
         } catch ProcessTerminationError.processIdentityChanged {
             let sentSignals = await executor.sentSignals
             XCTAssertTrue(sentSignals.isEmpty)
-            XCTAssertTrue(logger.errorMessages.contains("termination blocked reason=identity_changed pid=91"))
+            let errorText = logger.errorMessages.joined(separator: "\n")
+            XCTAssertTrue(errorText.contains("termination blocked reason=identity_changed pid=91"))
+            XCTAssertTrue(errorText.contains("detail=processNameMismatch(expected=nginx, actual=python)"))
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
@@ -129,7 +133,7 @@ final class ProcessTerminatorTests: XCTestCase {
 
     func testSignalFailureIsLoggedWithoutCommandLine() async {
         let executor = MockSignalExecutor(error: ProcessTerminationError.signalFailed("EPERM"))
-        let verifier = MockProcessIdentityVerifier(result: true)
+        let verifier = MockProcessIdentityVerifier(result: .matched)
         let logger = MockLogger()
         let terminator = ProcessTerminator(signalExecutor: executor, identityVerifier: verifier, logger: logger)
 
@@ -148,7 +152,7 @@ final class ProcessTerminatorTests: XCTestCase {
     func testSignalFailurePayloadIsNeverLoggedVerbatim() async {
         let entry = sample(privilege: .currentUser)
         let executor = MockSignalExecutor(error: ProcessTerminationError.signalFailed(entry.commandLine!))
-        let verifier = MockProcessIdentityVerifier(result: true)
+        let verifier = MockProcessIdentityVerifier(result: .matched)
         let logger = MockLogger()
         let terminator = ProcessTerminator(signalExecutor: executor, identityVerifier: verifier, logger: logger)
 
@@ -167,7 +171,7 @@ final class ProcessTerminatorTests: XCTestCase {
     func testHelperFailureIsLoggedWithoutCommandLine() async {
         let auth = MockAuthenticationClient(result: true)
         let helper = MockPrivilegedHelperClient(result: .failure(ProcessTerminationError.signalFailed("helper failed")))
-        let verifier = MockProcessIdentityVerifier(result: true)
+        let verifier = MockProcessIdentityVerifier(result: .matched)
         let logger = MockLogger()
         let terminator = ProcessTerminator(authenticationClient: auth, helperClient: helper, identityVerifier: verifier, logger: logger)
 
@@ -186,7 +190,7 @@ final class ProcessTerminatorTests: XCTestCase {
     func testHelperFailurePayloadIsNeverLoggedVerbatim() async {
         let auth = MockAuthenticationClient(result: true)
         let helper = MockPrivilegedHelperClient(result: .failure(ProcessTerminationError.signalFailed("node server.js --token=secret")))
-        let verifier = MockProcessIdentityVerifier(result: true)
+        let verifier = MockProcessIdentityVerifier(result: .matched)
         let logger = MockLogger()
         let terminator = ProcessTerminator(authenticationClient: auth, helperClient: helper, identityVerifier: verifier, logger: logger)
 
@@ -209,7 +213,7 @@ final class ProcessTerminatorTests: XCTestCase {
 
         let result = await verifier.verify(entry: sample(privilege: .currentUser))
 
-        XCTAssertFalse(result)
+        XCTAssertEqual(result, .mismatched(.processMissing))
     }
 
     func testIdentityVerifierRequiresSamePIDProcessNameUserAndPath() async {
@@ -257,12 +261,151 @@ final class ProcessTerminatorTests: XCTestCase {
         let mismatchedPathResult = await ProcessIdentityVerifier(metadataProvider: mismatchedPath).verify(entry: entry)
         let missingActualPathResult = await ProcessIdentityVerifier(metadataProvider: missingActualPath).verify(entry: entry)
         let partialCommandResult = await ProcessIdentityVerifier(metadataProvider: partialCommand).verify(entry: commandOnlyEntry)
-        XCTAssertTrue(matchingResult)
-        XCTAssertFalse(mismatchedNameResult)
-        XCTAssertFalse(mismatchedUserResult)
-        XCTAssertFalse(mismatchedPathResult)
-        XCTAssertFalse(missingActualPathResult)
-        XCTAssertFalse(partialCommandResult)
+        XCTAssertEqual(matchingResult, .matched)
+        XCTAssertEqual(mismatchedNameResult, .mismatched(.processNameMismatch(expected: "nginx", actual: "python")))
+        XCTAssertEqual(mismatchedUserResult, .mismatched(.userMismatch(expected: NSUserName(), actual: "root")))
+        XCTAssertEqual(
+            mismatchedPathResult,
+            .mismatched(.executablePathMismatch(
+                expected: "/usr/local/nginx/sbin/nginx",
+                actual: "/usr/bin/python3"
+            ))
+        )
+        // 关键新行为：entry 有 path，actual path 拿不到，但 pid/name/user 全一致 → 沙盒降级放行
+        XCTAssertEqual(missingActualPathResult, .matched)
+        // commandLine 拿不到算 mismatch（与路径降级不同，宁严勿松）
+        XCTAssertEqual(partialCommandResult, .mismatched(.commandLineMismatch(expected: "nginx: master process", actual: "nginx")))
+    }
+
+    // MARK: - ProcessIdentityVerifier 失败原因单测（每种 reason 一个 case）
+
+    func testVerifyProcessMissing() async {
+        let provider = MockMetadataProvider(metadata: [:], identities: [:])
+        let result = await ProcessIdentityVerifier(metadataProvider: provider).verify(entry: sample(privilege: .currentUser))
+        XCTAssertEqual(result, .mismatched(.processMissing))
+    }
+
+    func testVerifyUserMismatch() async {
+        let entry = sample(privilege: .currentUser)
+        let provider = MockMetadataProvider(
+            metadata: [entry.pid: ProcessMetadata(executablePath: entry.executablePath, commandLine: entry.commandLine)],
+            identities: [entry.pid: ProcessIdentity(pid: entry.pid, processName: entry.processName, user: "root", executablePath: entry.executablePath)]
+        )
+        let result = await ProcessIdentityVerifier(metadataProvider: provider).verify(entry: entry)
+        XCTAssertEqual(result, .mismatched(.userMismatch(expected: NSUserName(), actual: "root")))
+    }
+
+    func testVerifyExecutablePathMismatch() async {
+        let entry = sample(privilege: .currentUser)
+        let provider = MockMetadataProvider(
+            metadata: [entry.pid: ProcessMetadata(executablePath: "/usr/bin/python3", commandLine: entry.commandLine)],
+            identities: [entry.pid: ProcessIdentity(pid: entry.pid, processName: entry.processName, user: entry.user, executablePath: "/usr/bin/python3")]
+        )
+        let result = await ProcessIdentityVerifier(metadataProvider: provider).verify(entry: entry)
+        XCTAssertEqual(
+            result,
+            .mismatched(.executablePathMismatch(
+                expected: "/usr/local/nginx/sbin/nginx",
+                actual: "/usr/bin/python3"
+            ))
+        )
+    }
+
+    func testVerifyCommandLineMismatch() async {
+        let entry = sample(privilege: .currentUser)
+        let commandOnlyEntry = PortEntry(
+            protocolName: entry.protocolName,
+            address: entry.address,
+            port: entry.port,
+            pid: entry.pid,
+            processName: entry.processName,
+            user: entry.user,
+            executablePath: nil,
+            commandLine: entry.commandLine,
+            privilegeLevel: entry.privilegeLevel,
+            category: entry.category
+        )
+        let provider = MockMetadataProvider(
+            metadata: [entry.pid: ProcessMetadata(executablePath: nil, commandLine: "python3 server.py")],
+            identities: [entry.pid: ProcessIdentity(pid: entry.pid, processName: entry.processName, user: entry.user, executablePath: nil)]
+        )
+        let result = await ProcessIdentityVerifier(metadataProvider: provider).verify(entry: commandOnlyEntry)
+        XCTAssertEqual(
+            result,
+            .mismatched(.commandLineMismatch(expected: "nginx: master process", actual: "python3 server.py"))
+        )
+    }
+
+    func testVerifyMissingIdentityForComparison() async {
+        // entry 既无 path 也无 commandLine，ps 找得到但没东西可比对
+        let entry = sample(privilege: .currentUser)
+        let bareEntry = PortEntry(
+            protocolName: entry.protocolName,
+            address: entry.address,
+            port: entry.port,
+            pid: entry.pid,
+            processName: entry.processName,
+            user: entry.user,
+            executablePath: nil,
+            commandLine: nil,
+            privilegeLevel: entry.privilegeLevel,
+            category: entry.category
+        )
+        let provider = MockMetadataProvider(
+            metadata: [entry.pid: ProcessMetadata(executablePath: nil, commandLine: nil)],
+            identities: [entry.pid: ProcessIdentity(pid: entry.pid, processName: entry.processName, user: entry.user, executablePath: nil)]
+        )
+        let result = await ProcessIdentityVerifier(metadataProvider: provider).verify(entry: bareEntry)
+        XCTAssertEqual(result, .mismatched(.missingIdentityForComparison))
+    }
+
+    func testVerifyCommandLineUnavailableIsStrictMismatch() async {
+        // entry 有 commandLine 但 actual 拿不到（ps 失败），宁严勿松 → mismatch
+        let entry = sample(privilege: .currentUser)
+        let commandOnlyEntry = PortEntry(
+            protocolName: entry.protocolName,
+            address: entry.address,
+            port: entry.port,
+            pid: entry.pid,
+            processName: entry.processName,
+            user: entry.user,
+            executablePath: nil,
+            commandLine: entry.commandLine,
+            privilegeLevel: entry.privilegeLevel,
+            category: entry.category
+        )
+        let provider = MockMetadataProvider(
+            metadata: [entry.pid: ProcessMetadata(executablePath: nil, commandLine: nil)],
+            identities: [entry.pid: ProcessIdentity(pid: entry.pid, processName: entry.processName, user: entry.user, executablePath: nil)]
+        )
+        let result = await ProcessIdentityVerifier(metadataProvider: provider).verify(entry: commandOnlyEntry)
+        XCTAssertEqual(
+            result,
+            .mismatched(.commandLineMismatch(expected: "nginx: master process", actual: "<unavailable>"))
+        )
+    }
+
+    func testVerifyLenientPathUnavailableButIdentityMatches() async {
+        // 关键场景：entry 有 path（扫描时拿到），actual 拿不到 path（沙盒），pid/name/user 全一致
+        // → 沙盒降级放行 .matched
+        let entry = sample(privilege: .currentUser)
+        let provider = MockMetadataProvider(
+            metadata: [entry.pid: ProcessMetadata(executablePath: nil, commandLine: entry.commandLine)],
+            identities: [entry.pid: ProcessIdentity(pid: entry.pid, processName: entry.processName, user: entry.user, executablePath: nil)]
+        )
+        let result = await ProcessIdentityVerifier(metadataProvider: provider).verify(entry: entry)
+        XCTAssertEqual(result, .matched)
+    }
+
+    func testVerifyStillRejectsPathMismatchWhenPathAvailable() async {
+        // 防止降级过度：actual path 存在但不一致 → 仍要 mismatch
+        let entry = sample(privilege: .currentUser)
+        let provider = MockMetadataProvider(
+            metadata: [entry.pid: ProcessMetadata(executablePath: "/usr/bin/python3", commandLine: entry.commandLine)],
+            identities: [entry.pid: ProcessIdentity(pid: entry.pid, processName: entry.processName, user: entry.user, executablePath: "/usr/bin/python3")]
+        )
+        let result = await ProcessIdentityVerifier(metadataProvider: provider).verify(entry: entry)
+        XCTAssertNotEqual(result, .matched)
     }
 }
 
@@ -329,13 +472,13 @@ private actor MockPrivilegedHelperClient: PrivilegedHelperClienting {
 
 private actor MockProcessIdentityVerifier: ProcessIdentityVerifying {
     private(set) var verifiedPIDs: [Int32] = []
-    private let result: Bool
+    private let result: IdentityVerificationResult
 
-    init(result: Bool) {
+    init(result: IdentityVerificationResult) {
         self.result = result
     }
 
-    func verify(entry: PortEntry) async -> Bool {
+    func verify(entry: PortEntry) async -> IdentityVerificationResult {
         verifiedPIDs.append(entry.pid)
         return result
     }
@@ -357,12 +500,19 @@ private struct MockMetadataProvider: ProcessMetadataProviding {
 private final class MockLogger: PortWatchLogging, @unchecked Sendable {
     private let lock = NSLock()
     private var capturedInfoMessages: [String] = []
+    private var capturedWarningMessages: [String] = []
     private var capturedErrorMessages: [String] = []
 
     var infoMessages: [String] {
         lock.lock()
         defer { lock.unlock() }
         return capturedInfoMessages
+    }
+
+    var warningMessages: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return capturedWarningMessages
     }
 
     var errorMessages: [String] {
@@ -375,6 +525,12 @@ private final class MockLogger: PortWatchLogging, @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         capturedInfoMessages.append(message)
+    }
+
+    func warning(_ message: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        capturedWarningMessages.append(message)
     }
 
     func error(_ message: String) {

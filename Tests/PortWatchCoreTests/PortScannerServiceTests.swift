@@ -59,17 +59,79 @@ final class PortScannerServiceTests: XCTestCase {
         XCTAssertTrue(result.stderr.contains("err-20000"))
     }
 
-    func testMetadataProviderUsesProcPIDPathAndArgsOnly() async {
-        let executor = MockCommandExecutor(result: .success(CommandResult(stdout: "/opt/homebrew/bin/node server.js\n", stderr: "", exitCode: 0)))
+    func testMetadataProviderUsesProcPIDPathAndUcommAndArgs() async {
+        // 一次 ps 同时拿 ucomm（canonical processName）+ args，避免 lsof 的 COMMAND 字段
+        // 对 .app bundle 取短名导致扫描时 processName 与 verify 阶段不一致。
+        let executor = MockCommandExecutor(result: .success(CommandResult(stdout: "node /opt/homebrew/bin/node server.js\n", stderr: "", exitCode: 0)))
         let pathResolver = MockProcessPathResolver(paths: [8421: "/opt/homebrew/bin/node"])
         let provider = PSProcessMetadataProvider(executor: executor, pathResolver: pathResolver)
 
         let metadata = await provider.metadata(for: 8421)
 
         let commands = await executor.commands
-        XCTAssertEqual(commands, [CommandInvocation(executable: "/bin/ps", arguments: ["-p", "8421", "-o", "args="])])
+        XCTAssertEqual(commands, [CommandInvocation(executable: "/bin/ps", arguments: ["-p", "8421", "-o", "ucomm=", "-o", "args="])])
         XCTAssertEqual(metadata.executablePath, "/opt/homebrew/bin/node")
         XCTAssertEqual(metadata.commandLine, "/opt/homebrew/bin/node server.js")
+        XCTAssertEqual(metadata.processName, "node")
+    }
+
+    func testMetadataProviderHandlesUcommUnavailable() async {
+        // ps 失败或空输出时 processName 应为 nil（不强行猜测）
+        let executor = MockCommandExecutor(result: .success(CommandResult(stdout: "", stderr: "", exitCode: 1)))
+        let provider = PSProcessMetadataProvider(executor: executor, pathResolver: MockProcessPathResolver(paths: [:]))
+
+        let metadata = await provider.metadata(for: 8421)
+
+        XCTAssertNil(metadata.processName)
+        XCTAssertNil(metadata.commandLine)
+    }
+
+    func testScannerOverwritesProcessNameWithPSUcomm() async throws {
+        // lsof 给 ApifoxApp（.app 短名），ps -o ucomm= 给 ApifoxAppAgent（binary 短名）
+        // 扫描时必须用 ps 的版本覆盖，否则 verify 阶段 processName 误判。
+        let lsofOutput = """
+        COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+        ApifoxApp 956 alan   21u  IPv4 0x1    0t0      TCP 127.0.0.1:42950 (LISTEN)
+        """
+        let executor = MockCommandExecutor(result: .success(CommandResult(stdout: lsofOutput, stderr: "", exitCode: 0)))
+        let metadata = MockProcessMetadataProvider(metadata: [
+            956: ProcessMetadata(
+                processName: "ApifoxAppAgent",
+                executablePath: "/Applications/ApifoxApp.app/Contents/MacOS/ApifoxAppAgent",
+                commandLine: "/Applications/ApifoxApp.app/Contents/MacOS/ApifoxAppAgent"
+            )
+        ])
+        let scanner = PortScannerService(
+            executor: executor,
+            parser: LsofParser(currentUserName: "alan"),
+            metadataProvider: metadata
+        )
+
+        let result = try await scanner.scanListeningPorts()
+
+        XCTAssertEqual(result.entries.count, 1)
+        XCTAssertEqual(result.entries[0].processName, "ApifoxAppAgent", "必须用 ps 拿的 ucomm 覆盖 lsof 的 COMMAND")
+    }
+
+    func testScannerKeepsLsofProcessNameWhenPSUcommUnavailable() async throws {
+        // ps 拿不到 processName 时，保留 lsof 的（fail-closed，行为可预测）
+        let lsofOutput = """
+        COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+        mysqld    123 root   21u  IPv4 0x1    0t0      TCP 127.0.0.1:3306 (LISTEN)
+        """
+        let executor = MockCommandExecutor(result: .success(CommandResult(stdout: lsofOutput, stderr: "", exitCode: 0)))
+        let metadata = MockProcessMetadataProvider(metadata: [
+            123: ProcessMetadata(processName: nil, executablePath: nil, commandLine: "mysqld")
+        ])
+        let scanner = PortScannerService(
+            executor: executor,
+            parser: LsofParser(currentUserName: "alan"),
+            metadataProvider: metadata
+        )
+
+        let result = try await scanner.scanListeningPorts()
+
+        XCTAssertEqual(result.entries[0].processName, "mysqld")
     }
 
     func testIdentityProviderUsesUcommForLsofCommandName() async {
