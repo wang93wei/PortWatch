@@ -36,6 +36,7 @@ struct MenuBarStatusView: View {
                 openWindow(id: "main")
                 NSApp.activate(ignoringOtherApps: true)
             }
+            .applyMenuBarButtonStyle()
             Button(store.refreshInterval == .paused ? "恢复刷新" : "暂停刷新") {
                 if store.refreshInterval == .paused {
                     store.setRefreshInterval(.defaultValue)
@@ -43,12 +44,15 @@ struct MenuBarStatusView: View {
                     store.setRefreshInterval(.paused)
                 }
             }
+            .applyMenuBarButtonStyle()
             Button("手动刷新") {
                 Task { await store.refreshNow() }
             }
+            .applyMenuBarButtonStyle()
             Button("退出") {
                 NSApp.terminate(nil)
             }
+            .applyMenuBarButtonStyle()
         }
         .padding(8)
         .frame(width: 320)

@@ -13,13 +13,13 @@ struct PortDetailView: View {
                         AppIconView(path: entry.executablePath, size: 40)
                             .padding(.top, 2)
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("\(entry.processName) · PID \(entry.pid)")
+                            // Text(verbatim:) 走 String init，完全跳过 LocalizedStringKey 路径，
+                            // 避免数字被 NumberFormatter 按 locale 加千分位（22372 → 22,372）。
+                            // 和 ca1c75f 修端口/PID 列的思路一致：禁用本地化数字格式。
+                            Text(verbatim: "\(entry.processName) · PID \(entry.pid)")
                                 .font(.headline)
-                            Text(entry.executablePath ?? "可执行路径不可用")
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Text(entry.commandLine ?? "启动命令不可用")
+                            // 只显示一行：可执行路径优先，缺失时回退到启动命令，再缺失显示占位文案。
+                            Text(entry.executablePath ?? entry.commandLine ?? "路径不可用")
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
@@ -38,14 +38,14 @@ struct PortDetailView: View {
                         Button("结束进程") {
                             Task { await store.terminate(entry: entry, mode: .graceful) }
                         }
-                        .buttonStyle(.borderedProminent)
                         .tint(.red)
+                        .applyTerminationButtonStyle(prominent: true)
 
                         Button("强制结束") {
                             store.requestForceTermination(for: entry)
                         }
-                        .buttonStyle(.bordered)
-                        .foregroundStyle(.red)
+                        .tint(.red)
+                        .applyTerminationButtonStyle(prominent: false)
                         .disabled(store.forceTerminationCandidate != PortStore.ForceTerminationCandidate(entry: entry))
                         .confirmationDialog(
                             "强制结束 \(entry.processName) (PID \(entry.pid))？",
@@ -81,6 +81,14 @@ struct PortDetailView: View {
             } else {
                 ContentUnavailableView("选择一个端口", systemImage: "cursorarrow.click", description: Text("详情和操作会显示在这里"))
             }
+        }
+        // entry 切换（或首次出现）时清空 lastTerminationMessage，
+        // 避免切到别的 entry 仍显示上次的 PID（"已发送 SIGTERM 到 PID 956" 但当前选中 71733）。
+        .onAppear {
+            store.entrySelectionChanged()
+        }
+        .onChange(of: entry?.id) { _, _ in
+            store.entrySelectionChanged()
         }
     }
 }
