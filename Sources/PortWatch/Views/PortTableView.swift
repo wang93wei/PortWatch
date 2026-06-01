@@ -9,13 +9,6 @@ struct PortTableView: View {
         VStack(spacing: 0) {
             toolbar
             Table(store.filteredEntries, selection: $selectedPortEntryID) {
-                TableColumn("标记") { entry in
-                    Button(store.favoritePorts.contains(entry.port) ? "★" : "☆") {
-                        store.toggleFavorite(port: entry.port)
-                    }
-                    .buttonStyle(.plain)
-                    .help(store.favoritePorts.contains(entry.port) ? "取消常用端口" : "标记为常用端口")
-                }
                 TableColumn("端口") { entry in Text(String(entry.port)).fontWeight(.semibold) }
                 TableColumn("协议") { entry in Text(entry.protocolName.rawValue.uppercased()) }
                 TableColumn("地址") { entry in Text(entry.address) }
@@ -31,9 +24,6 @@ struct PortTableView: View {
                 }
             }
             .contextMenu(forSelectionType: String.self) { selection in
-                Button("标记/取消常用") {
-                    selection.compactMap(entry(for:)).forEach { store.toggleFavorite(port: $0.port) }
-                }
                 Button("结束进程") {
                     selection.compactMap(entry(for:)).first.map { selectedEntry in
                         Task { await store.terminate(entry: selectedEntry, mode: .graceful) }
