@@ -34,6 +34,11 @@ struct PortTableView: View {
                 Button("标记/取消常用") {
                     selection.compactMap(entry(for:)).forEach { store.toggleFavorite(port: $0.port) }
                 }
+                Button("结束进程") {
+                    selection.compactMap(entry(for:)).first.map { selectedEntry in
+                        Task { await store.terminate(entry: selectedEntry, mode: .graceful) }
+                    }
+                }
                 Button("复制 lsof 命令") {
                     selection.compactMap(entry(for:)).first.map {
                         PasteboardClient.copy("lsof -nP -iTCP:\($0.port) -sTCP:LISTEN")
