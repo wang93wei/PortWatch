@@ -57,6 +57,19 @@ struct PortTableView: View {
             if store.isRefreshing {
                 ProgressView().controlSize(.small)
             }
+            Picker("刷新间隔", selection: Binding(
+                get: { store.refreshInterval },
+                set: { store.setRefreshInterval($0) }
+            )) {
+                ForEach(RefreshInterval.presets, id: \.self) { interval in
+                    Text(interval.label).tag(interval)
+                }
+                if case let .custom(seconds) = store.refreshInterval {
+                    Text("自定义 \(seconds) 秒").tag(RefreshInterval.custom(seconds: seconds))
+                }
+            }
+            .labelsHidden()
+            .frame(width: 120)
             Button("刷新") {
                 Task { await store.refreshNow() }
             }

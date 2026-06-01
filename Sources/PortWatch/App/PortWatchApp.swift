@@ -17,17 +17,12 @@ struct PortWatchApp: App {
         }
 
         MenuBarExtra("PortWatch", systemImage: "network") {
-            Text("PortWatch")
-            Button("打开主窗口") {
-                NSApp.activate(ignoringOtherApps: true)
-            }
-            Button("刷新") {
-                Task { await portStore.refreshNow() }
-            }
-            Divider()
-            Button("退出") {
-                NSApp.terminate(nil)
-            }
+            MenuBarStatusView(store: portStore)
+        }
+        .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView(store: portStore)
         }
     }
 }
