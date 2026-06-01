@@ -10,15 +10,19 @@ struct PortDetailView: View {
             if let entry {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .top) {
+                        AppIconView(path: entry.executablePath, size: 40)
+                            .padding(.top, 2)
                         VStack(alignment: .leading, spacing: 6) {
                             Text("\(entry.processName) · PID \(entry.pid)")
                                 .font(.headline)
                             Text(entry.executablePath ?? "可执行路径不可用")
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
+                                .truncationMode(.middle)
                             Text(entry.commandLine ?? "启动命令不可用")
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
+                                .truncationMode(.middle)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 8) {
