@@ -13,7 +13,8 @@ let package = Package(
         .executableTarget(
             name: "PortWatch",
             dependencies: ["PortWatchCore"],
-            path: "Sources/PortWatch"
+            path: "Sources/PortWatch",
+            exclude: ["Resources/Info.plist"]
         ),
         .testTarget(
             name: "PortWatchCoreTests",
