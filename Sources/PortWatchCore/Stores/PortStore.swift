@@ -115,7 +115,12 @@ public final class PortStore {
 
     @discardableResult
     public func refreshNow() async -> Bool {
-        guard !isRefreshing else { return false }
+        // 重入时不静默丢弃：若已有刷新 in-flight（例如 startAutoRefresh 后台任务
+        // 正在扫描时用户点"结束进程"），等当前扫描完成后再扫一次，保证 caller 意图被执行。
+        // 旧行为是直接 return false，导致 terminate 后端口条目要等下一轮自动刷新才更新。
+        while isRefreshing {
+            await Task.yield()
+        }
         isRefreshing = true
         defer { isRefreshing = false }
 
@@ -181,6 +186,13 @@ public final class PortStore {
 
     public func cancelForceTermination() {
         pendingForceTerminationEntry = nil
+    }
+
+    /// 用户在列表里切换了选中 entry。用来清空"上次结束操作"的消息，
+    /// 避免切到别的 entry 还显示陈旧 PID。
+    /// 不清 force state：force 状态本身已与具体 entry 绑定，不匹配 entry 的按钮天然 disabled。
+    public func entrySelectionChanged() {
+        lastTerminationMessage = nil
     }
 
     private func reconcileForceStateAfterRefresh() {
