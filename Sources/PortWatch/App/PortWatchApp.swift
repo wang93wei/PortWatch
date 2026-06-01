@@ -10,6 +10,7 @@ struct PortWatchApp: App {
     var body: some Scene {
         WindowGroup("PortWatch", id: "main") {
             RootView(store: portStore)
+                .preferredColorScheme(portStore.colorSchemePreference.swiftUIScheme)
                 .task {
                     portStore.startAutoRefresh()
                     await portStore.refreshNow()

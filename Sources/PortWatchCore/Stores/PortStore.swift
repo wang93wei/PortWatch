@@ -14,10 +14,12 @@ public final class PortStore {
     public var selectedFilter: PortFilter = .listening
     public var searchText = ""
     public var refreshInterval: RefreshInterval
+    public private(set) var colorSchemePreference: ColorSchemePreference
 
     private let scanner: PortScanning
     private let favoritesStore: FavoritesStoring
     private let refreshIntervalStore: RefreshIntervalStoring
+    private let colorSchemePreferenceStore: ColorSchemePreferenceStoring
     private let terminator: ProcessTerminating
     private var refreshTask: Task<Void, Never>?
 
@@ -55,13 +57,16 @@ public final class PortStore {
         scanner: PortScanning = PortScannerService(),
         favoritesStore: FavoritesStoring = UserDefaultsFavoritesStore(),
         refreshIntervalStore: RefreshIntervalStoring = UserDefaultsRefreshIntervalStore(),
-        terminator: ProcessTerminating = ProcessTerminator()
+        terminator: ProcessTerminating = ProcessTerminator(),
+        colorSchemePreferenceStore: ColorSchemePreferenceStoring = UserDefaultsColorSchemePreferenceStore()
     ) {
         self.scanner = scanner
         self.favoritesStore = favoritesStore
         self.refreshIntervalStore = refreshIntervalStore
         self.refreshInterval = refreshIntervalStore.load()
         self.terminator = terminator
+        self.colorSchemePreferenceStore = colorSchemePreferenceStore
+        self.colorSchemePreference = colorSchemePreferenceStore.load()
     }
 
     public var favoritePorts: Set<Int> {
@@ -84,6 +89,11 @@ public final class PortStore {
         refreshInterval = interval
         refreshIntervalStore.save(interval)
         startAutoRefresh()
+    }
+
+    public func setColorSchemePreference(_ preference: ColorSchemePreference) {
+        colorSchemePreference = preference
+        colorSchemePreferenceStore.save(preference)
     }
 
     public func startAutoRefresh() {

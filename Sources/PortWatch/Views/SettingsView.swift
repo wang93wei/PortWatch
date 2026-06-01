@@ -14,6 +14,14 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Picker("外观", selection: Binding(
+                get: { store.colorSchemePreference },
+                set: { store.setColorSchemePreference($0) }
+            )) {
+                ForEach(ColorSchemePreference.allCases, id: \.self) { preference in
+                    Text(preference.label).tag(preference)
+                }
+            }
             Picker("刷新间隔", selection: refreshSelection) {
                 ForEach(RefreshInterval.presets, id: \.self) { interval in
                     Text(interval.label).tag(interval)
