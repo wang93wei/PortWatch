@@ -17,7 +17,8 @@ let package = Package(
         ),
         .testTarget(
             name: "PortWatchCoreTests",
-            dependencies: ["PortWatchCore"]
+            dependencies: ["PortWatchCore"],
+            resources: [.process("Fixtures")]
         )
     ]
 )
