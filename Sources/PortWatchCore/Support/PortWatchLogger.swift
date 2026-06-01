@@ -3,6 +3,7 @@ import os
 
 public protocol PortWatchLogging: Sendable {
     func info(_ message: String)
+    func warning(_ message: String)
     func error(_ message: String)
 }
 
@@ -15,6 +16,10 @@ public struct PortWatchLogger: PortWatchLogging {
 
     public func info(_ message: String) {
         logger.info("\(message, privacy: .public)")
+    }
+
+    public func warning(_ message: String) {
+        logger.warning("\(message, privacy: .public)")
     }
 
     public func error(_ message: String) {

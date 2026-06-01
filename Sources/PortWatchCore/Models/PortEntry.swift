@@ -61,4 +61,22 @@ public struct PortEntry: Identifiable, Hashable, Codable, Sendable {
         self.privilegeLevel = privilegeLevel
         self.category = category
     }
+
+    /// 用新的 processName 构造一份副本，其它字段不变。
+    /// 用于在 PortScannerService enrich 阶段把 lsof 的 COMMAND 字段（对 .app bundle 取短名）
+    /// 替换为 ps -o ucomm= 拿到的 canonical name，避免 verify 阶段 processName 误判。
+    public func overriding(processName: String) -> PortEntry {
+        PortEntry(
+            protocolName: protocolName,
+            address: address,
+            port: port,
+            pid: pid,
+            processName: processName,
+            user: user,
+            executablePath: executablePath,
+            commandLine: commandLine,
+            privilegeLevel: privilegeLevel,
+            category: category
+        )
+    }
 }
