@@ -16,11 +16,11 @@ struct PortTableView: View {
                     .buttonStyle(.plain)
                     .help(store.favoritePorts.contains(entry.port) ? "取消常用端口" : "标记为常用端口")
                 }
-                TableColumn("端口") { entry in Text("\(entry.port)").fontWeight(.semibold) }
+                TableColumn("端口") { entry in Text(String(entry.port)).fontWeight(.semibold) }
                 TableColumn("协议") { entry in Text(entry.protocolName.rawValue.uppercased()) }
                 TableColumn("地址") { entry in Text(entry.address) }
                 TableColumn("进程") { entry in Text(entry.processName) }
-                TableColumn("PID") { entry in Text("\(entry.pid)") }
+                TableColumn("PID") { entry in Text(String(entry.pid)) }
                 TableColumn("用户") { entry in Text(entry.user) }
                 TableColumn("路径") { entry in Text(entry.executablePath ?? "不可用").foregroundStyle(.secondary) }
                 TableColumn("操作") { entry in
