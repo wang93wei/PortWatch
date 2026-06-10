@@ -25,6 +25,7 @@
 		63FF4C2EB3F44B2DAE3A1439 /* MenuBarStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9F963208812D27469FD0223 /* MenuBarStatusView.swift */; };
 		6D6D7D5DE056F961DBDD4D63 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2803520A1CF7CCFEC6CEDB49 /* SidebarView.swift */; };
 		712C5C131F4F38299EE67E0C /* PortFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62534FE7C5204410E7F781C7 /* PortFilter.swift */; };
+		71E87706BCA32ED0FCE6375B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BAC1201AE724D8A510F4289D /* Assets.xcassets */; };
 		7B05A1DBB848056A2B3C48FF /* PortWatchCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 09C17D18AC62C5E13BC1F1EA /* PortWatchCore.framework */; };
 		861E197101994A8D593E67E8 /* ProcessTerminator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED7640675F858D14A7EB8388 /* ProcessTerminator.swift */; };
 		8FD335059C833D93A2B0F111 /* PasteboardClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C5ADEF6CD446FE4504FA9E /* PasteboardClient.swift */; };
@@ -100,6 +101,7 @@
 		9FCB38562751C4742484D172 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		AF40BAAB149FAD42A01B0DCC /* FavoritesStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesStoreTests.swift; sourceTree = "<group>"; };
 		B50681BF2E335F66B6963D71 /* PortFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortFilterTests.swift; sourceTree = "<group>"; };
+		BAC1201AE724D8A510F4289D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BAD7798A524B65502692BAA4 /* PortScannerServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortScannerServiceTests.swift; sourceTree = "<group>"; };
 		BECAA8DBF33166DE05B3B397 /* PortWatchCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PortWatchCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C289874CC0EBDF31DD878BE5 /* PortDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortDetailView.swift; sourceTree = "<group>"; };
@@ -256,6 +258,14 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		C90B1726B9B8A0F61BD9B6BC /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				BAC1201AE724D8A510F4289D /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		CC673EB028AD6C6A40E1CD31 /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -284,6 +294,7 @@
 			isa = PBXGroup;
 			children = (
 				B67603CD3BCC5A86603A3588 /* App */,
+				C90B1726B9B8A0F61BD9B6BC /* Resources */,
 				A22A79F8682B3F3831BC9A1E /* Support */,
 				CC673EB028AD6C6A40E1CD31 /* Views */,
 			);
@@ -298,6 +309,7 @@
 			buildConfigurationList = BE9714642CEA9EF58A774ADF /* Build configuration list for PBXNativeTarget "PortWatch" */;
 			buildPhases = (
 				7020297BD383DDA29E68921C /* Sources */,
+				B819647F08D6B2AE5DF177DA /* Resources */,
 				83C3ADE4591A927B9771B97D /* Frameworks */,
 			);
 			buildRules = (
@@ -396,6 +408,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				FD3EFBB7D3E170A2C7214518 /* Fixtures in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B819647F08D6B2AE5DF177DA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				71E87706BCA32ED0FCE6375B /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -553,7 +573,7 @@
 		3772A24C4278AD0E9508723F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = A5PCWS3WGL;
@@ -701,7 +721,7 @@
 		F744639E879DDEDE6FC716A2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = A5PCWS3WGL;
