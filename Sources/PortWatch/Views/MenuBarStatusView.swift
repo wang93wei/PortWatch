@@ -11,23 +11,23 @@ struct MenuBarStatusView: View {
             HStack {
                 Text("监听端口")
                 Spacer()
-                Text("\(store.entries.count)")
+                Text(verbatim: "\(store.listeningEntryCount)")
                     .fontWeight(.semibold)
             }
             HStack {
                 Text("高权限进程")
                 Spacer()
-                Text("\(store.entries.filter { $0.privilegeLevel != .currentUser }.count)")
+                Text(verbatim: "\(store.privilegedEntryCount)")
                     .fontWeight(.semibold)
             }
             Divider()
-            ForEach(menuEntries.prefix(5)) { entry in
+            ForEach(store.menuEntries) { entry in
                 HStack {
-                    Text("\(entry.port)")
+                    Text(verbatim: "\(entry.port)")
                         .fontWeight(.semibold)
                     Text(entry.processName)
                     Spacer()
-                    Text("PID \(entry.pid)")
+                    Text(verbatim: "PID \(entry.pid)")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -56,10 +56,5 @@ struct MenuBarStatusView: View {
         }
         .padding(8)
         .frame(width: 320)
-    }
-
-    private var menuEntries: [PortEntry] {
-        let favorites = store.entries.filter { store.favoritePorts.contains($0.port) }
-        return favorites.isEmpty ? Array(store.entries.prefix(5)) : favorites
     }
 }

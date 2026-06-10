@@ -29,18 +29,18 @@ struct PortTableView: View {
             }
             .contextMenu(forSelectionType: String.self) { selection in
                 Button("结束进程") {
-                    selection.compactMap(entry(for:)).first.map { selectedEntry in
+                    if let selectedEntry = selection.compactMap(entry(for:)).first {
                         Task { await store.terminate(entry: selectedEntry, mode: .graceful) }
                     }
                 }
                 Button("复制 lsof 命令") {
-                    selection.compactMap(entry(for:)).first.map {
-                        PasteboardClient.copy("lsof -nP -iTCP:\($0.port) -sTCP:LISTEN")
+                    if let selectedEntry = selection.compactMap(entry(for:)).first {
+                        PasteboardClient.copy("lsof -nP -iTCP:\(selectedEntry.port) -sTCP:LISTEN")
                     }
                 }
                 Button("复制 TERM 命令") {
-                    selection.compactMap(entry(for:)).first.map {
-                        PasteboardClient.copy("kill -TERM \($0.pid)")
+                    if let selectedEntry = selection.compactMap(entry(for:)).first {
+                        PasteboardClient.copy("kill -TERM \(selectedEntry.pid)")
                     }
                 }
             }
@@ -53,10 +53,7 @@ struct PortTableView: View {
                 if store.isRefreshing {
                     ProgressView().controlSize(.small)
                 }
-                Picker("刷新间隔", selection: Binding(
-                    get: { store.refreshInterval },
-                    set: { store.setRefreshInterval($0) }
-                )) {
+                Picker("刷新间隔", selection: $store.refreshInterval) {
                     ForEach(RefreshInterval.presets, id: \.self) { interval in
                         Text(interval.label).tag(interval)
                     }

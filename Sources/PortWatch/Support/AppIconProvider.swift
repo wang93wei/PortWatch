@@ -3,6 +3,8 @@ import SwiftUI
 
 /// 提供按文件路径获取 macOS 文件/App 图标的能力。
 enum AppIconProvider {
+    private static let iconCache = NSCache<NSString, NSImage>()
+
     /// 将可执行文件路径解析为对应的 .app bundle 路径（若可推断）。
     /// 例：`/Applications/QQ.app/Contents/MacOS/QQ` → `/Applications/QQ.app`
     static func appBundlePath(for executablePath: String) -> String? {
@@ -23,8 +25,16 @@ enum AppIconProvider {
     /// 同步获取文件或 .app 的 NSImage 图标（主线程调用，系统有缓存）。
     static func icon(for path: String, size: CGFloat = 32) -> NSImage? {
         let lookupPath = appBundlePath(for: path) ?? path
-        let image = NSWorkspace.shared.icon(forFile: lookupPath)
-        image.size = NSSize(width: size, height: size)
+        let cacheKey = "\(lookupPath)#\(size)" as NSString
+        if let cachedImage = iconCache.object(forKey: cacheKey) {
+            return cachedImage
+        }
+
+        let image = (NSWorkspace.shared.icon(forFile: lookupPath).copy() as? NSImage)
+        image?.size = NSSize(width: size, height: size)
+        if let image {
+            iconCache.setObject(image, forKey: cacheKey)
+        }
         return image
     }
 }

@@ -8,7 +8,7 @@ struct SidebarView: View {
         List(selection: $store.selectedFilter) {
             ForEach(PortFilter.sidebarCases) { filter in
                 Label(filter.title, systemImage: icon(for: filter))
-                    .badge(count(for: filter))
+                    .badge(store.count(for: filter))
                     .tag(filter)
             }
         }
@@ -24,9 +24,5 @@ struct SidebarView: View {
         case .development: return "hammer"
         case .externalConnections: return "point.3.connected.trianglepath.dotted"
         }
-    }
-
-    private func count(for filter: PortFilter) -> Int {
-        filter.apply(to: store.entries, favoritePorts: store.favoritePorts, searchText: "").count
     }
 }

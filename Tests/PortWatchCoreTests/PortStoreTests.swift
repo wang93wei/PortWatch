@@ -1,4 +1,5 @@
 import XCTest
+import Observation
 @testable import PortWatchCore
 
 final class PortStoreTests: XCTestCase {
@@ -50,6 +51,166 @@ final class PortStoreTests: XCTestCase {
         let filteredPorts = filteredEntries.map(\.port)
         XCTAssertEqual(filteredPorts, [5432])
     }
+
+    @MainActor
+    func testToggleFavoriteNotifiesFilteredEntriesObservers() async {
+        let scanner = MockScanner(results: [
+            .success(PortScanResult(entries: [sample(port: 3000)], skippedLineCount: 0, duration: 0.01))
+        ])
+        let store = PortStore(scanner: scanner, favoritesStore: InMemoryFavoritesStore(initialFavorites: []))
+
+        await store.refreshNow()
+        store.setFilter(.favorites)
+
+        let changeObserved = expectation(description: "filteredEntries observation should update when favorites change")
+        withObservationTracking {
+            _ = store.filteredEntries.map(\.port)
+        } onChange: {
+            changeObserved.fulfill()
+        }
+
+        store.toggleFavorite(port: 3000)
+
+        await fulfillment(of: [changeObserved], timeout: 0.2)
+        XCTAssertEqual(store.filteredEntries.map(\.port), [3000])
+    }
+
+    @MainActor
+    func testToggleFavoriteNotifiesSidebarCountObservers() async {
+        let scanner = MockScanner(results: [
+            .success(PortScanResult(entries: [sample(port: 3000)], skippedLineCount: 0, duration: 0.01))
+        ])
+        let store = PortStore(scanner: scanner, favoritesStore: InMemoryFavoritesStore(initialFavorites: []))
+
+        await store.refreshNow()
+
+        let changeObserved = expectation(description: "sidebar count observation should update when favorites change")
+        withObservationTracking {
+            _ = store.count(for: .favorites)
+        } onChange: {
+            changeObserved.fulfill()
+        }
+
+        store.toggleFavorite(port: 3000)
+
+        await fulfillment(of: [changeObserved], timeout: 0.2)
+        XCTAssertEqual(store.count(for: .favorites), 1)
+    }
+
+    func testDerivedCountsAndMenuEntriesUpdateAfterRefreshAndFavorites() async {
+        let scanner = MockScanner(results: [
+            .success(PortScanResult(entries: [
+                sample(port: 3000),
+                sample(port: 5432, processName: "postgres", privilegeLevel: .rootOrSystem),
+                sample(port: 5173),
+                sample(port: 8080),
+                sample(port: 9000),
+                sample(port: 10000)
+            ], skippedLineCount: 0, duration: 0.01))
+        ])
+        let store = await PortStore(scanner: scanner, favoritesStore: InMemoryFavoritesStore(initialFavorites: [5432]))
+
+        await store.refreshNow()
+
+        let listeningCount = await store.listeningEntryCount
+        let privilegedCount = await store.privilegedEntryCount
+        let favoritesCount = await store.count(for: .favorites)
+        let initialMenuPorts = await store.menuEntries.map(\.port)
+        XCTAssertEqual(listeningCount, 6)
+        XCTAssertEqual(privilegedCount, 1)
+        XCTAssertEqual(favoritesCount, 1)
+        XCTAssertEqual(initialMenuPorts, [5432])
+
+        await store.toggleFavorite(port: 3000)
+
+        let updatedFavoritesCount = await store.count(for: .favorites)
+        let updatedMenuPorts = await store.menuEntries.map(\.port)
+        XCTAssertEqual(updatedFavoritesCount, 2)
+        XCTAssertEqual(updatedMenuPorts, [3000, 5432])
+    }
+
+    func testMenuEntriesFallBackToFirstFiveEntriesWithoutFavorites() async {
+        let scanner = MockScanner(results: [
+            .success(PortScanResult(entries: [
+                sample(port: 3000),
+                sample(port: 5432),
+                sample(port: 5173),
+                sample(port: 8080),
+                sample(port: 9000),
+                sample(port: 10000)
+            ], skippedLineCount: 0, duration: 0.01))
+        ])
+        let store = await PortStore(scanner: scanner, favoritesStore: InMemoryFavoritesStore(initialFavorites: []))
+
+        await store.refreshNow()
+
+        let menuPorts = await store.menuEntries.map(\.port)
+        XCTAssertEqual(menuPorts, [3000, 5432, 5173, 8080, 9000])
+    }
+
+    @MainActor
+    func testRequestedColorSchemePreferenceIsAppliedOnNextMainActorTurn() async {
+        let preferenceSaved = expectation(description: "color scheme preference should be saved asynchronously")
+        let colorSchemeStore = RecordingColorSchemePreferenceStore(initialPreference: .automatic)
+        colorSchemeStore.onSave = { preferenceSaved.fulfill() }
+        let store = PortStore(
+            scanner: MockScanner(results: []),
+            favoritesStore: InMemoryFavoritesStore(initialFavorites: []),
+            colorSchemePreferenceStore: colorSchemeStore
+        )
+
+        store.requestColorSchemePreference(.dark)
+
+        XCTAssertEqual(store.colorSchemePreference, .automatic)
+
+        await fulfillment(of: [preferenceSaved], timeout: 0.5)
+
+        XCTAssertEqual(store.colorSchemePreference, .dark)
+        XCTAssertEqual(colorSchemeStore.savedPreferences, [.dark])
+    }
+
+    @MainActor
+    func testRequestedColorSchemePreferenceCoalescesMultipleSameTurnRequests() async {
+        let preferenceSaved = expectation(description: "last color scheme preference should be saved asynchronously")
+        let colorSchemeStore = RecordingColorSchemePreferenceStore(initialPreference: .automatic)
+        colorSchemeStore.onSave = { preferenceSaved.fulfill() }
+        let store = PortStore(
+            scanner: MockScanner(results: []),
+            favoritesStore: InMemoryFavoritesStore(initialFavorites: []),
+            colorSchemePreferenceStore: colorSchemeStore
+        )
+
+        store.requestColorSchemePreference(.light)
+        store.requestColorSchemePreference(.dark)
+
+        XCTAssertEqual(store.colorSchemePreference, .automatic)
+
+        await fulfillment(of: [preferenceSaved], timeout: 0.5)
+
+        XCTAssertEqual(store.colorSchemePreference, .dark)
+        XCTAssertEqual(colorSchemeStore.savedPreferences, [.dark])
+    }
+
+    @MainActor
+    func testRequestedColorSchemePreferenceCancelsPendingRequestWhenPreferenceReturnsToCurrentValue() async {
+        let preferenceSaved = expectation(description: "color scheme preference should not be saved")
+        preferenceSaved.isInverted = true
+        let colorSchemeStore = RecordingColorSchemePreferenceStore(initialPreference: .automatic)
+        colorSchemeStore.onSave = { preferenceSaved.fulfill() }
+        let store = PortStore(
+            scanner: MockScanner(results: []),
+            favoritesStore: InMemoryFavoritesStore(initialFavorites: []),
+            colorSchemePreferenceStore: colorSchemeStore
+        )
+
+        store.requestColorSchemePreference(.dark)
+        store.requestColorSchemePreference(.automatic)
+
+        await fulfillment(of: [preferenceSaved], timeout: 0.2)
+
+        XCTAssertEqual(store.colorSchemePreference, .automatic)
+        XCTAssertEqual(colorSchemeStore.savedPreferences, [])
+    }
 }
 
 private actor MockScanner: PortScanning {
@@ -74,7 +235,31 @@ private actor SlowScanner: PortScanning {
     }
 }
 
-private func sample(port: Int, processName: String = "node") -> PortEntry {
+private final class RecordingColorSchemePreferenceStore: ColorSchemePreferenceStoring {
+    private let initialPreference: ColorSchemePreference
+    private(set) var savedPreferences: [ColorSchemePreference] = []
+    var onSave: (() -> Void)?
+
+    init(initialPreference: ColorSchemePreference) {
+        self.initialPreference = initialPreference
+    }
+
+    func load() -> ColorSchemePreference {
+        initialPreference
+    }
+
+    func save(_ preference: ColorSchemePreference) {
+        savedPreferences.append(preference)
+        onSave?()
+    }
+}
+
+private func sample(
+    port: Int,
+    processName: String = "node",
+    privilegeLevel: PrivilegeLevel = .currentUser,
+    category: PortCategory = .development
+) -> PortEntry {
     PortEntry(
         protocolName: .tcp,
         address: "127.0.0.1",
@@ -84,7 +269,7 @@ private func sample(port: Int, processName: String = "node") -> PortEntry {
         user: "alan",
         executablePath: nil,
         commandLine: nil,
-        privilegeLevel: .currentUser,
-        category: .development
+        privilegeLevel: privilegeLevel,
+        category: category
     )
 }

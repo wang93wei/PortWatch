@@ -4,17 +4,41 @@ import Observation
 @MainActor
 @Observable
 public final class PortStore {
-    public private(set) var entries: [PortEntry] = []
+    public private(set) var entries: [PortEntry] = [] {
+        didSet { recomputeDerivedState() }
+    }
     public private(set) var isRefreshing = false
     public private(set) var lastErrorMessage: String?
     public private(set) var lastRefreshDate: Date?
     public private(set) var lastTerminationMessage: String?
     public private(set) var pendingForceTerminationEntry: PortEntry?
     public private(set) var forceTerminationCandidate: ForceTerminationCandidate?
-    public var selectedFilter: PortFilter = .listening
-    public var searchText = ""
-    public var refreshInterval: RefreshInterval
-    public private(set) var colorSchemePreference: ColorSchemePreference
+    public private(set) var favoritePorts: Set<Int> {
+        didSet { recomputeDerivedState() }
+    }
+    public private(set) var filteredEntries: [PortEntry] = []
+    public private(set) var menuEntries: [PortEntry] = []
+    public private(set) var listeningEntryCount = 0
+    public private(set) var privilegedEntryCount = 0
+    public var selectedFilter: PortFilter = .listening {
+        didSet { recomputeDerivedState() }
+    }
+    public var searchText = "" {
+        didSet { recomputeDerivedState() }
+    }
+    public var refreshInterval: RefreshInterval {
+        didSet {
+            guard refreshInterval != oldValue else { return }
+            refreshIntervalStore.save(refreshInterval)
+            startAutoRefresh()
+        }
+    }
+    public var colorSchemePreference: ColorSchemePreference {
+        didSet {
+            guard colorSchemePreference != oldValue else { return }
+            colorSchemePreferenceStore.save(colorSchemePreference)
+        }
+    }
 
     private let scanner: PortScanning
     private let favoritesStore: FavoritesStoring
@@ -22,6 +46,8 @@ public final class PortStore {
     private let colorSchemePreferenceStore: ColorSchemePreferenceStoring
     private let terminator: ProcessTerminating
     private var refreshTask: Task<Void, Never>?
+    private var colorSchemePreferenceTask: Task<Void, Never>?
+    private var sidebarCounts: [PortFilter: Int] = [:]
 
     public struct ForceTerminationCandidate: Equatable, Sendable {
         public let id: String
@@ -62,19 +88,13 @@ public final class PortStore {
     ) {
         self.scanner = scanner
         self.favoritesStore = favoritesStore
+        self.favoritePorts = favoritesStore.favoritePorts
         self.refreshIntervalStore = refreshIntervalStore
         self.refreshInterval = refreshIntervalStore.load()
         self.terminator = terminator
         self.colorSchemePreferenceStore = colorSchemePreferenceStore
         self.colorSchemePreference = colorSchemePreferenceStore.load()
-    }
-
-    public var favoritePorts: Set<Int> {
-        favoritesStore.favoritePorts
-    }
-
-    public var filteredEntries: [PortEntry] {
-        selectedFilter.apply(to: entries, favoritePorts: favoritePorts, searchText: searchText)
+        recomputeDerivedState()
     }
 
     public func setFilter(_ filter: PortFilter) {
@@ -83,17 +103,35 @@ public final class PortStore {
 
     public func toggleFavorite(port: Int) {
         favoritesStore.toggle(port: port)
+        favoritePorts = favoritesStore.favoritePorts
+    }
+
+    public func count(for filter: PortFilter) -> Int {
+        sidebarCounts[filter, default: 0]
     }
 
     public func setRefreshInterval(_ interval: RefreshInterval) {
         refreshInterval = interval
-        refreshIntervalStore.save(interval)
-        startAutoRefresh()
     }
 
     public func setColorSchemePreference(_ preference: ColorSchemePreference) {
         colorSchemePreference = preference
-        colorSchemePreferenceStore.save(preference)
+    }
+
+    public func requestColorSchemePreference(_ preference: ColorSchemePreference) {
+        guard colorSchemePreference != preference else {
+            colorSchemePreferenceTask?.cancel()
+            colorSchemePreferenceTask = nil
+            return
+        }
+
+        colorSchemePreferenceTask?.cancel()
+        colorSchemePreferenceTask = Task { @MainActor [weak self] in
+            await Task.yield()
+            guard !Task.isCancelled, let self else { return }
+            self.setColorSchemePreference(preference)
+            self.colorSchemePreferenceTask = nil
+        }
     }
 
     public func startAutoRefresh() {
@@ -193,6 +231,18 @@ public final class PortStore {
     /// 不清 force state：force 状态本身已与具体 entry 绑定，不匹配 entry 的按钮天然 disabled。
     public func entrySelectionChanged() {
         lastTerminationMessage = nil
+    }
+
+    private func recomputeDerivedState() {
+        filteredEntries = selectedFilter.apply(to: entries, favoritePorts: favoritePorts, searchText: searchText)
+        listeningEntryCount = entries.count
+        privilegedEntryCount = PortFilter.privileged.apply(to: entries, favoritePorts: favoritePorts, searchText: "").count
+        sidebarCounts = Dictionary(uniqueKeysWithValues: PortFilter.sidebarCases.map { filter in
+            (filter, filter.apply(to: entries, favoritePorts: favoritePorts, searchText: "").count)
+        })
+
+        let favoriteEntries = entries.filter { favoritePorts.contains($0.port) }
+        menuEntries = Array((favoriteEntries.isEmpty ? entries : favoriteEntries).prefix(5))
     }
 
     private func reconcileForceStateAfterRefresh() {
