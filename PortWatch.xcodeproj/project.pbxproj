@@ -16,6 +16,7 @@
 		257BC2C3A3FFABD23DE1560D /* AppIconProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BBA75E9A98F209FD030E30A /* AppIconProvider.swift */; };
 		2827C9AEC64E514F2EAA5C1D /* PortStoreTerminationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F04F30BB13B5E1A163B1F8D /* PortStoreTerminationTests.swift */; };
 		2DDE9E45C9976DD6D463BB27 /* PortDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C289874CC0EBDF31DD878BE5 /* PortDetailView.swift */; };
+		320215034AE6CE7FA0D52F9F /* PortWatchCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 09C17D18AC62C5E13BC1F1EA /* PortWatchCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		33E4ABF66C29D36C87522B93 /* PortWatchCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 09C17D18AC62C5E13BC1F1EA /* PortWatchCore.framework */; };
 		379B90CDDBF982346115D2EE /* PortTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 741544467E5DF9F631EBCC27 /* PortTableView.swift */; };
 		482E56B84473E3D94030AF30 /* PortStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F52AC3E103769947FBE2CCB /* PortStore.swift */; };
@@ -69,6 +70,20 @@
 			remoteInfo = PortWatchCore;
 		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B9788F71311E666EF7A030FE /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				320215034AE6CE7FA0D52F9F /* PortWatchCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		09C17D18AC62C5E13BC1F1EA /* PortWatchCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = PortWatchCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -311,6 +326,7 @@
 				7020297BD383DDA29E68921C /* Sources */,
 				B819647F08D6B2AE5DF177DA /* Resources */,
 				83C3ADE4591A927B9771B97D /* Frameworks */,
+				B9788F71311E666EF7A030FE /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -687,6 +703,7 @@
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				ENABLE_MODULE_VERIFIER = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -755,6 +772,7 @@
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				ENABLE_MODULE_VERIFIER = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

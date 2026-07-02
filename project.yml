@@ -34,7 +34,7 @@ targets:
         INFOPLIST_FILE: Sources/PortWatch/Resources/Info.plist
     dependencies:
       - target: PortWatchCore
-        embed: false
+        embed: true
   PortWatchCore:
     type: framework
     platform: macOS
@@ -46,6 +46,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: local.portwatch.core
         PRODUCT_NAME: PortWatchCore
         DEFINES_MODULE: "YES"
+        GENERATE_INFOPLIST_FILE: "YES"
         SKIP_INSTALL: "YES"
         BUILD_LIBRARY_FOR_DISTRIBUTION: "NO"
   PortWatchCoreTests:
