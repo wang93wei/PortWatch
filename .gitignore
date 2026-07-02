@@ -5,6 +5,7 @@
 DerivedData/
 .build/
 build/
+docs/
 *.xcuserstate
 xcuserdata/
 [Cc][Ll][Aa][Uu][Dd][Ee].md
